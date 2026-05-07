@@ -1,24 +1,3 @@
-/**
- * ============================================================
- *  FlowTask — Complete Backend (server.js)
- *  Stack : Express.js + SQLite (better-sqlite3) + JWT + bcrypt
- * ============================================================
- *
- *  SETUP (run once):
- *    npm init -y
- *    npm install express better-sqlite3 bcryptjs jsonwebtoken cors dotenv
- *
- *  START:
- *    node server.js        (or: nodemon server.js)
- *
- *  ENV  →  create a .env file:
- *    PORT=5000
- *    JWT_SECRET=your_super_secret_key_here
- *
- *  BASE URL : http://localhost:5000/api
- * ============================================================
- */
-
 require("dotenv").config();
 const express = require("express");
 const Database = require("better-sqlite3");
@@ -27,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const path = require("path");
 
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || "flowtask_dev_secret_change_in_prod";
 const JWT_EXPIRES = "7d";
@@ -85,7 +64,7 @@ db.exec(`
   );
 `);
 
-// ─── SEED DEMO DATA (only if users table empty) ───────────────────────────────
+// ─── SEED DEMO DATA ───────────────────────────────────────────────────────────
 const seedDB = () => {
   const count = db.prepare("SELECT COUNT(*) as c FROM users").get().c;
   if (count > 0) return;
@@ -129,14 +108,14 @@ const seedDB = () => {
 seedDB();
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-const respond = (res, status, data) => res.status(status).json(data);
-const ok      = (res, data)         => respond(res, 200, { success: true, ...data });
-const created = (res, data)         => respond(res, 201, { success: true, ...data });
-const badReq  = (res, msg)          => respond(res, 400, { success: false, message: msg });
-const unauth  = (res, msg)          => respond(res, 401, { success: false, message: msg });
-const forbid  = (res, msg)          => respond(res, 403, { success: false, message: msg });
-const notFound= (res, msg)          => respond(res, 404, { success: false, message: msg });
-const err500  = (res, e)            => { console.error(e); respond(res, 500, { success: false, message: "Server error" }); };
+const respond  = (res, status, data) => res.status(status).json(data);
+const ok       = (res, data)         => respond(res, 200, { success: true,  ...data });
+const created  = (res, data)         => respond(res, 201, { success: true,  ...data });
+const badReq   = (res, msg)          => respond(res, 400, { success: false, message: msg });
+const unauth   = (res, msg)          => respond(res, 401, { success: false, message: msg });
+const forbid   = (res, msg)          => respond(res, 403, { success: false, message: msg });
+const notFound = (res, msg)          => respond(res, 404, { success: false, message: msg });
+const err500   = (res, e)            => { console.error(e); respond(res, 500, { success: false, message: "Server error" }); };
 
 const makeToken = (user) =>
   jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
@@ -147,15 +126,12 @@ const safeUser = (u) => {
 };
 
 // ─── MIDDLEWARES ──────────────────────────────────────────────────────────────
-
-/** Verify JWT and attach req.user */
 const auth = (req, res, next) => {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) return unauth(res, "No token provided");
   const token = header.split(" ")[1];
   try {
     req.user = jwt.verify(token, JWT_SECRET);
-    // Refresh user from DB (role may have changed)
     const u = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
     if (!u) return unauth(res, "User not found");
     req.user = u;
@@ -165,13 +141,11 @@ const auth = (req, res, next) => {
   }
 };
 
-/** Admin-only gate */
 const adminOnly = (req, res, next) => {
   if (req.user.role !== "admin") return forbid(res, "Admin access required");
   next();
 };
 
-/** Check if user is member of a project (or admin) */
 const projectAccess = (req, res, next) => {
   const projectId = Number(req.params.projectId || req.body.project_id);
   if (!projectId) return badReq(res, "project_id required");
@@ -185,15 +159,9 @@ const projectAccess = (req, res, next) => {
   next();
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  AUTH ROUTES  /api/auth
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── AUTH ROUTES ──────────────────────────────────────────────────────────────
 const authRouter = express.Router();
 
-/**
- * POST /api/auth/signup
- * Body: { name, email, password, role? }
- */
 authRouter.post("/signup", (req, res) => {
   try {
     const { name, email, password, role = "member" } = req.body;
@@ -203,10 +171,10 @@ authRouter.post("/signup", (req, res) => {
     const exists = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
     if (exists) return badReq(res, "Email already registered");
 
-    const hashed   = bcrypt.hashSync(password, 10);
-    const inits    = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-    const colors   = ["#7c6af7","#f97316","#22c55e","#ef4444","#eab308","#06b6d4"];
-    const avatar   = colors[Math.floor(Math.random() * colors.length)];
+    const hashed = bcrypt.hashSync(password, 10);
+    const inits  = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+    const colors = ["#7c6af7","#f97316","#22c55e","#ef4444","#eab308","#06b6d4"];
+    const avatar = colors[Math.floor(Math.random() * colors.length)];
 
     const result = db.prepare(
       "INSERT INTO users (name, email, password, role, avatar, initials) VALUES (?,?,?,?,?,?)"
@@ -217,10 +185,6 @@ authRouter.post("/signup", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/**
- * POST /api/auth/login
- * Body: { email, password }
- */
 authRouter.post("/login", (req, res) => {
   try {
     const { email, password } = req.body;
@@ -236,20 +200,14 @@ authRouter.post("/login", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/**
- * GET /api/auth/me  →  current user info
- */
 authRouter.get("/me", auth, (req, res) => {
   ok(res, { user: safeUser(req.user) });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  USER ROUTES  /api/users  (admin only except GET self)
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── USER ROUTES ──────────────────────────────────────────────────────────────
 const usersRouter = express.Router();
 usersRouter.use(auth);
 
-/** GET /api/users  →  all users (admin) or just self (member) */
 usersRouter.get("/", (req, res) => {
   try {
     if (req.user.role === "admin") {
@@ -260,7 +218,6 @@ usersRouter.get("/", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** GET /api/users/:id */
 usersRouter.get("/:id", (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -271,7 +228,6 @@ usersRouter.get("/:id", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** PATCH /api/users/:id  →  update name / role (admin), or own profile */
 usersRouter.patch("/:id", (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -281,7 +237,6 @@ usersRouter.patch("/:id", (req, res) => {
     if (!user) return notFound(res, "User not found");
 
     const { name, role, avatar } = req.body;
-    // Members cannot promote themselves
     if (role && req.user.role !== "admin") return forbid(res, "Only admins can change roles");
     if (role && !["admin","member"].includes(role)) return badReq(res, "Invalid role");
 
@@ -298,7 +253,6 @@ usersRouter.patch("/:id", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** DELETE /api/users/:id  (admin only) */
 usersRouter.delete("/:id", adminOnly, (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -310,13 +264,10 @@ usersRouter.delete("/:id", adminOnly, (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  PROJECT ROUTES  /api/projects
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── PROJECT ROUTES ───────────────────────────────────────────────────────────
 const projectsRouter = express.Router();
 projectsRouter.use(auth);
 
-/** Helper: get project with members array */
 const getProjectWithMembers = (projectId) => {
   const proj = db.prepare("SELECT * FROM projects WHERE id = ?").get(projectId);
   if (!proj) return null;
@@ -326,7 +277,6 @@ const getProjectWithMembers = (projectId) => {
   return { ...proj, members };
 };
 
-/** GET /api/projects  →  admin: all  |  member: their projects */
 projectsRouter.get("/", (req, res) => {
   try {
     let rows;
@@ -342,7 +292,6 @@ projectsRouter.get("/", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** GET /api/projects/:projectId */
 projectsRouter.get("/:projectId", (req, res) => {
   try {
     const id = Number(req.params.projectId);
@@ -354,7 +303,6 @@ projectsRouter.get("/:projectId", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** POST /api/projects  (admin only) */
 projectsRouter.post("/", adminOnly, (req, res) => {
   try {
     const { name, description = "", member_ids = [] } = req.body;
@@ -365,8 +313,6 @@ projectsRouter.post("/", adminOnly, (req, res) => {
     ).run(name, description, req.user.id);
 
     const projectId = result.lastInsertRowid;
-
-    // Always add creator as member
     const memberSet = new Set([req.user.id, ...member_ids.map(Number)]);
     const insertMember = db.prepare("INSERT OR IGNORE INTO project_members (project_id, user_id) VALUES (?,?)");
     memberSet.forEach(uid => insertMember.run(projectId, uid));
@@ -376,7 +322,6 @@ projectsRouter.post("/", adminOnly, (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** PATCH /api/projects/:projectId  (admin only) */
 projectsRouter.patch("/:projectId", adminOnly, (req, res) => {
   try {
     const id = Number(req.params.projectId);
@@ -398,7 +343,6 @@ projectsRouter.patch("/:projectId", adminOnly, (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** DELETE /api/projects/:projectId  (admin only) */
 projectsRouter.delete("/:projectId", adminOnly, (req, res) => {
   try {
     const id = Number(req.params.projectId);
@@ -409,7 +353,6 @@ projectsRouter.delete("/:projectId", adminOnly, (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** POST /api/projects/:projectId/members  →  add member (admin) */
 projectsRouter.post("/:projectId/members", adminOnly, (req, res) => {
   try {
     const projectId = Number(req.params.projectId);
@@ -424,7 +367,6 @@ projectsRouter.post("/:projectId/members", adminOnly, (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** DELETE /api/projects/:projectId/members/:userId  →  remove member (admin) */
 projectsRouter.delete("/:projectId/members/:userId", adminOnly, (req, res) => {
   try {
     const projectId = Number(req.params.projectId);
@@ -434,13 +376,10 @@ projectsRouter.delete("/:projectId/members/:userId", adminOnly, (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  TASK ROUTES  /api/tasks  and  /api/projects/:projectId/tasks
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── TASK ROUTES ──────────────────────────────────────────────────────────────
 const tasksRouter = express.Router();
 tasksRouter.use(auth);
 
-/** Helper: enrich task with user & project info */
 const enrichTask = (task) => {
   const assignee = task.assigned_to
     ? safeUser(db.prepare("SELECT * FROM users WHERE id = ?").get(task.assigned_to))
@@ -450,7 +389,6 @@ const enrichTask = (task) => {
   return { ...task, assignee, creator, project };
 };
 
-/** GET /api/tasks  →  admin: all tasks | member: assigned to them */
 tasksRouter.get("/", (req, res) => {
   try {
     const { status, priority, project_id } = req.query;
@@ -470,7 +408,6 @@ tasksRouter.get("/", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** GET /api/tasks/:id */
 tasksRouter.get("/:id", (req, res) => {
   try {
     const task = db.prepare("SELECT * FROM tasks WHERE id = ?").get(Number(req.params.id));
@@ -480,7 +417,6 @@ tasksRouter.get("/:id", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** POST /api/tasks  (admin only) */
 tasksRouter.post("/", adminOnly, (req, res) => {
   try {
     const { title, description = "", project_id, assigned_to, status = "todo", priority = "medium", due_date } = req.body;
@@ -495,8 +431,8 @@ tasksRouter.post("/", adminOnly, (req, res) => {
       if (!user) return notFound(res, "Assigned user not found");
     }
 
-    if (!["todo","inprogress","done"].includes(status))   return badReq(res, "Invalid status");
-    if (!["low","medium","high"].includes(priority))      return badReq(res, "Invalid priority");
+    if (!["todo","inprogress","done"].includes(status))  return badReq(res, "Invalid status");
+    if (!["low","medium","high"].includes(priority))     return badReq(res, "Invalid priority");
 
     const result = db.prepare(
       "INSERT INTO tasks (title, description, project_id, assigned_to, created_by, status, priority, due_date) VALUES (?,?,?,?,?,?,?,?)"
@@ -507,10 +443,6 @@ tasksRouter.post("/", adminOnly, (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** PATCH /api/tasks/:id
- *  Admin: can change anything
- *  Member: can only change status of tasks assigned to them
- */
 tasksRouter.patch("/:id", (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -519,7 +451,6 @@ tasksRouter.patch("/:id", (req, res) => {
 
     if (req.user.role !== "admin") {
       if (task.assigned_to !== req.user.id) return forbid(res, "You can only update your own tasks");
-      // Members can only update status
       const { status } = req.body;
       if (!status) return badReq(res, "Members can only update status");
       if (!["todo","inprogress","done"].includes(status)) return badReq(res, "Invalid status");
@@ -528,7 +459,6 @@ tasksRouter.patch("/:id", (req, res) => {
       return ok(res, { task: enrichTask(updated) });
     }
 
-    // Admin: full update
     const { title, description, assigned_to, status, priority, due_date } = req.body;
     if (status   && !["todo","inprogress","done"].includes(status))  return badReq(res, "Invalid status");
     if (priority && !["low","medium","high"].includes(priority))     return badReq(res, "Invalid priority");
@@ -558,7 +488,6 @@ tasksRouter.patch("/:id", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-/** DELETE /api/tasks/:id  (admin only) */
 tasksRouter.delete("/:id", adminOnly, (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -569,13 +498,10 @@ tasksRouter.delete("/:id", adminOnly, (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  DASHBOARD / STATS ROUTES  /api/stats
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── STATS ROUTES ─────────────────────────────────────────────────────────────
 const statsRouter = express.Router();
 statsRouter.use(auth);
 
-/** GET /api/stats  →  summary for logged-in user */
 statsRouter.get("/", (req, res) => {
   try {
     const today = new Date().toISOString().split("T")[0];
@@ -597,7 +523,6 @@ statsRouter.get("/", (req, res) => {
       overdue:    allTasks.filter(t => t.status !== "done" && t.due_date && t.due_date < today).length,
     };
 
-    // Project progress
     let projRows;
     if (req.user.role === "admin") {
       projRows = db.prepare("SELECT id, name FROM projects").all();
@@ -617,7 +542,6 @@ statsRouter.get("/", (req, res) => {
       };
     });
 
-    // Recent tasks (last 5)
     const recentTasks = allTasks
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 5)
@@ -627,22 +551,24 @@ statsRouter.get("/", (req, res) => {
   } catch (e) { err500(res, e); }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  MOUNT ROUTES
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── MOUNT API ROUTES ─────────────────────────────────────────────────────────
 app.use("/api/auth",     authRouter);
 app.use("/api/users",    usersRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/tasks",    tasksRouter);
 app.use("/api/stats",    statsRouter);
 
-/** Health check */
+// ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 app.get("/api/health", (_, res) => ok(res, { message: "FlowTask API is running 🚀" }));
 
-/** 404 fallback */
-app.use((req, res) => respond(res, 404, { success: false, message: `Route ${req.method} ${req.url} not found` }));
+// ─── SERVE REACT FRONTEND ─────────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, "client", "dist")));
 
-// ─── START ────────────────────────────────────────────────────────────────────
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
+});
+
+// ─── START SERVER ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 FlowTask API running → http://localhost:${PORT}/api`);
   console.log(`📋 Health check       → http://localhost:${PORT}/api/health`);
@@ -651,48 +577,3 @@ app.listen(PORT, () => {
   console.log(`   Member → member@demo.com / member123`);
   console.log(`   Member → rahul@demo.com  / rahul123\n`);
 });
-
-/**
- * ============================================================
- *  FULL API REFERENCE
- * ============================================================
- *
- *  AUTH
- *  ─────────────────────────────────────────────────
- *  POST   /api/auth/signup          { name, email, password, role? }
- *  POST   /api/auth/login           { email, password }
- *  GET    /api/auth/me              (auth required)
- *
- *  USERS  (auth required)
- *  ─────────────────────────────────────────────────
- *  GET    /api/users                admin: all | member: self
- *  GET    /api/users/:id
- *  PATCH  /api/users/:id            { name?, role?(admin), avatar? }
- *  DELETE /api/users/:id            (admin only)
- *
- *  PROJECTS  (auth required)
- *  ─────────────────────────────────────────────────
- *  GET    /api/projects             admin: all | member: own
- *  GET    /api/projects/:id
- *  POST   /api/projects             (admin) { name, description?, member_ids? }
- *  PATCH  /api/projects/:id         (admin) { name?, description?, member_ids? }
- *  DELETE /api/projects/:id         (admin)
- *  POST   /api/projects/:id/members (admin) { user_id }
- *  DELETE /api/projects/:id/members/:uid (admin)
- *
- *  TASKS  (auth required)
- *  ─────────────────────────────────────────────────
- *  GET    /api/tasks                ?status=&priority=&project_id=
- *  GET    /api/tasks/:id
- *  POST   /api/tasks                (admin) { title, project_id, description?, assigned_to?, status?, priority?, due_date? }
- *  PATCH  /api/tasks/:id            admin: all fields | member: { status } only
- *  DELETE /api/tasks/:id            (admin)
- *
- *  STATS
- *  ─────────────────────────────────────────────────
- *  GET    /api/stats                dashboard summary for current user
- *
- *  All protected routes need header:
- *    Authorization: Bearer <token>
- * ============================================================
- */
