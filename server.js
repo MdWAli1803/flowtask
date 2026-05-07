@@ -564,7 +564,7 @@ app.get("/api/health", (_, res) => ok(res, { message: "FlowTask API is running �
 // ─── SERVE REACT FRONTEND ─────────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, "client", "dist")));
 
-app.get("*", (req, res) => {
+app.get("/{*path}", (req, res) => {
   res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
 });
 
